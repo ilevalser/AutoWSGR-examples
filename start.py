@@ -764,7 +764,7 @@ class MainWindow(QMainWindow):
             self.update_config_value('emulator_type', text)
 
     def open_ship_types_dialog(self):
-        current_types = self.config_data.get('destroy_ship_types', [])
+        current_types = self.config_data.get('destroy_ship_types') or []
         dialog = ShipTypesDialog(current_types, self)
         dialog.types_selected.connect(lambda types: self.update_config_value('destroy_ship_types', types))
         dialog.exec()
