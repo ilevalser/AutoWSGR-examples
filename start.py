@@ -14,10 +14,12 @@ from PyQt6.QtGui import QFont, QTextCursor
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedSeq
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
+from pathlib import Path
 
 # 全局变量和常量
-CONFIG_FILE = 'user_settings.yaml'
-PLANS_DIR = './plans/normal_fight/'
+SCRIPT_DIR = Path(__file__).parent.absolute()
+CONFIG_FILE = str(SCRIPT_DIR / 'user_settings.yaml')
+PLANS_DIR = str(SCRIPT_DIR / 'plans' / 'normal_fight')
 
 # 按类别划分的舰种
 SHIP_TYPE_CATEGORIES = {
@@ -547,7 +549,8 @@ class MainWindow(QMainWindow):
         self.db_repair_level_combo = QComboBox()
         self.db_full_destroy_cb = QCheckBox("船坞满时解装(仅决战)")
         self.db_useful_skill_cb = QCheckBox("充分利用教官技能")
-        
+        self.db_useful_skill_strict_cb = QCheckBox("严格利用教官技能")
+
         self.db_sortie_count_spin.setRange(1, 999)
         self.db_chapter_spin.setRange(1, 6)
         items = [("中破修", 1), ("大破修", 2)]
@@ -559,6 +562,7 @@ class MainWindow(QMainWindow):
         left_layout.addRow("维修策略:", self.db_repair_level_combo)
         left_layout.addRow(self.db_full_destroy_cb)
         left_layout.addRow(self.db_useful_skill_cb)
+        left_layout.addRow(self.db_useful_skill_strict_cb)
         
         top_h_splitter.addWidget(left_panel)
         top_h_splitter.addWidget(self.db_log_display)
@@ -605,7 +609,8 @@ class MainWindow(QMainWindow):
         self.db_chapter_spin.valueChanged.connect(lambda val: self.update_config_value("decisive_battle.chapter", val))
         self.db_repair_level_combo.currentIndexChanged.connect(lambda index: self.update_config_value("decisive_battle.repair_level", items[index][1]))
         self.db_full_destroy_cb.toggled.connect(lambda checked: self.update_config_value("decisive_battle.full_destroy", checked))
-        self.db_useful_skill_cb.toggled.connect(lambda checked: self.update_config_value("decisive_battle.useful_skill", checked))
+        self.db_useful_skill_cb.toggled.connect(self.on_useful_skill_toggled)
+        self.db_useful_skill_strict_cb.toggled.connect(lambda checked: self.update_config_value("decisive_battle.useful_skill_strict", checked))
         self.db_level1_input.textChanged.connect(lambda text: self.update_list_config("decisive_battle.level1", text))
         self.db_level2_input.textChanged.connect(lambda text: self.update_list_config("decisive_battle.level2", text))
         self.db_flagship_priority_input.textChanged.connect(lambda text: self.update_list_config("decisive_battle.flagship_priority", text))
@@ -722,7 +727,10 @@ class MainWindow(QMainWindow):
         self.db_flagship_priority_input.setText(", ".join(map(str, decisive.get('flagship_priority', []))))
         self.db_repair_level_combo.setCurrentIndex(decisive.get('repair_level', 2) - 1)
         self.db_full_destroy_cb.setChecked(decisive.get('full_destroy', False))
-        self.db_useful_skill_cb.setChecked(decisive.get('useful_skill', False))
+        is_useful_skill_enabled = decisive.get('useful_skill', False)
+        self.db_useful_skill_cb.setChecked(is_useful_skill_enabled)
+        self.db_useful_skill_strict_cb.setChecked(decisive.get('useful_skill_strict', False))
+        self.db_useful_skill_strict_cb.setVisible(is_useful_skill_enabled)
         self.check_decisive_battle_fleet()
         # 活动
         event = self.config_data.get('event_automation', {})
@@ -906,6 +914,18 @@ class MainWindow(QMainWindow):
             self.db_log_display.moveCursor(QTextCursor.MoveOperation.End)
             self.db_log_display.insertPlainText(full_text)
             self.db_log_display.verticalScrollBar().setValue(self.db_log_display.verticalScrollBar().maximum())
+
+    def on_useful_skill_toggled(self, checked):
+        """当“充分利用教官技能”复选框状态改变时，更新配置并控制“严格利用”复选框的显隐"""
+        self.update_config_value("decisive_battle.useful_skill", checked)
+        self.db_useful_skill_strict_cb.setVisible(checked)
+        # 如果主框被取消，则子框也应被取消
+        if checked:
+            # 如果主复选框被勾选，则子复选框也自动设为True
+            self.db_useful_skill_strict_cb.setChecked(True)
+        else:
+            # 如果主复选框被取消，则子复选框也应被取消
+            self.db_useful_skill_strict_cb.setChecked(False)
 
     def _parse_ship_list(self, text: str):
         """辅助函数，用于从逗号分隔的字符串中解析出列表"""
